@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getRoutes, getComparison } from '../adapters/infrastructure/routesService';
+import { getRoutes, getComparison, createRoute, setBaseline } from '../adapters/infrastructure/routesService';
 import { gramsToTonnes } from '../shared/units';
 
 export default function RoutesTab() {
@@ -10,16 +10,40 @@ export default function RoutesTab() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [filterFuel, setFilterFuel] = useState<string>('all');
   const [filterVessel, setFilterVessel] = useState<string>('all');
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState<any>({
+    route_id: '',
+    vessel_type: '',
+    fuel_type: '',
+    year: '',
+    ghg_intensity: '',
+    fuel_consumption_t: '',
+    distance_km: '',
+    ops_energy_mj: '',
+    lcv_mj_per_g: ''
+  });
+  const [formError, setFormError] = useState<string>('');
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const [r, c] = await Promise.all([getRoutes(), getComparison()]);
-      setRoutes(r);
-      setComparison(c);
-      setLoading(false);
-    })();
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    const [r, c] = await Promise.all([getRoutes(), getComparison()]);
+    setRoutes(r);
+    setComparison(c);
+    setLoading(false);
+  };
+
+  const handleSetBaseline = async (routeId: number) => {
+    try {
+      await setBaseline(routeId);
+      await loadData();
+    } catch (error) {
+      console.error('Failed to set baseline:', error);
+    }
+  };
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -35,8 +59,8 @@ export default function RoutesTab() {
     .filter(r => filterVessel === 'all' || r.vessel_type === filterVessel)
     .sort((a, b) => {
       if (!sortField) return 0;
-      const aVal = a[sortField];
-      const bVal = b[sortField];
+      const aVal = a[sortField] ?? 0;
+      const bVal = b[sortField] ?? 0;
       const direction = sortDirection === 'asc' ? 1 : -1;
       return aVal < bVal ? -direction : direction;
     });
@@ -71,6 +95,12 @@ export default function RoutesTab() {
           <h3 className="text-2xl font-bold text-neutral-900">Routes Overview</h3>
           <p className="text-sm text-neutral-500 mt-1">{routes.length} total routes</p>
         </div>
+        <button
+          onClick={() => setShowModal(true)}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+        >
+          Add Route
+        </button>
       </div>
 
       {/* Summary Cards */}
@@ -175,16 +205,18 @@ export default function RoutesTab() {
                   { key: 'ghg_intensity', label: 'GHGI (gCO₂e/MJ)' },
                   { key: 'fuel_consumption_g', label: 'Fuel (t)' },
                   { key: 'distance_km', label: 'Distance (km)' },
-                  { key: 'is_baseline', label: 'Baseline' }
+                  { key: 'total_emissions_t', label: 'Total Emissions (t)' },
+                  { key: 'is_baseline', label: 'Baseline' },
+                  { key: 'actions', label: 'Actions' }
                 ].map(({ key, label }) => (
                   <th 
                     key={key}
-                    onClick={() => handleSort(key)}
-                    className="text-left px-4 py-3 text-xs font-semibold text-neutral-600 uppercase tracking-wider cursor-pointer hover:bg-neutral-100 transition-colors select-none"
+                    onClick={() => key !== 'actions' && handleSort(key)}
+                    className={`text-left px-4 py-3 text-xs font-semibold text-neutral-600 uppercase tracking-wider ${key !== 'actions' ? 'cursor-pointer hover:bg-neutral-100' : ''} transition-colors select-none`}
                   >
                     <div className="flex items-center gap-1">
                       {label}
-                      {sortField === key && (
+                      {sortField === key && key !== 'actions' && (
                         <svg className={`h-4 w-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                         </svg>
@@ -208,6 +240,7 @@ export default function RoutesTab() {
                   <td className="px-4 py-3 text-sm text-neutral-700">{r.ghg_intensity}</td>
                   <td className="px-4 py-3 text-sm text-neutral-700">{Number(gramsToTonnes(Number(r.fuel_consumption_g || 0))).toFixed(2)}</td>
                   <td className="px-4 py-3 text-sm text-neutral-700">{Number(r.distance_km || 0).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-sm text-neutral-700">{r.total_emissions_t != null ? Number(r.total_emissions_t).toFixed(2) : '—'}</td>
                   <td className="px-4 py-3 text-sm">
                     {r.is_baseline ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -218,6 +251,16 @@ export default function RoutesTab() {
                       </span>
                     ) : (
                       <span className="text-neutral-400 text-xs">No</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {!r.is_baseline && (
+                      <button
+                        onClick={() => handleSetBaseline(r.id)}
+                        className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                      >
+                        Set as Baseline
+                      </button>
                     )}
                   </td>
                 </tr>
@@ -301,6 +344,181 @@ export default function RoutesTab() {
           </>
         )}
       </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-neutral-900">Add Route</h2>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setFormError('');
+                }}
+                className="text-neutral-400 hover:text-neutral-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {formError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+                {formError}
+              </div>
+            )}
+            <form>
+              <div className="flex flex-wrap gap-4">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-medium text-neutral-700 mb-1.5">Route ID *</label>
+                  <input 
+                    type="text" 
+                    value={form.route_id} 
+                    onChange={(e) => setForm({ ...form, route_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-medium text-neutral-700 mb-1.5">Vessel Type</label>
+                  <input 
+                    type="text" 
+                    value={form.vessel_type} 
+                    onChange={(e) => setForm({ ...form, vessel_type: e.target.value })}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-medium text-neutral-700 mb-1.5">Fuel Type</label>
+                  <input 
+                    type="text" 
+                    value={form.fuel_type} 
+                    onChange={(e) => setForm({ ...form, fuel_type: e.target.value })}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-medium text-neutral-700 mb-1.5">Year</label>
+                  <input 
+                    type="number" 
+                    value={form.year} 
+                    onChange={(e) => setForm({ ...form, year: e.target.value })}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-medium text-neutral-700 mb-1.5">GHG Intensity (gCO₂e/MJ)</label>
+                  <input 
+                    type="number" 
+                    value={form.ghg_intensity} 
+                    onChange={(e) => setForm({ ...form, ghg_intensity: e.target.value })}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-medium text-neutral-700 mb-1.5">Fuel Consumption (t)</label>
+                  <input 
+                    type="number" 
+                    value={form.fuel_consumption_t} 
+                    onChange={(e) => setForm({ ...form, fuel_consumption_t: e.target.value })}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-medium text-neutral-700 mb-1.5">Distance (km)</label>
+                  <input 
+                    type="number" 
+                    value={form.distance_km} 
+                    onChange={(e) => setForm({ ...form, distance_km: e.target.value })}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-medium text-neutral-700 mb-1.5">Ops Energy (MJ)</label>
+                  <input 
+                    type="number" 
+                    value={form.ops_energy_mj} 
+                    onChange={(e) => setForm({ ...form, ops_energy_mj: e.target.value })}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-medium text-neutral-700 mb-1.5">LCV (MJ/g)</label>
+                  <input 
+                    type="number" 
+                    step="0.001"
+                    value={form.lcv_mj_per_g} 
+                    onChange={(e) => setForm({ ...form, lcv_mj_per_g: e.target.value })}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button 
+                  type="submit" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setFormError('');
+                    
+                    if (!form.route_id || form.route_id.trim() === '') {
+                      setFormError('Route ID is required');
+                      return;
+                    }
+                    
+                    const payload = {
+                      route_id: form.route_id.trim(),
+                      vessel_type: form.vessel_type || null,
+                      fuel_type: form.fuel_type || null,
+                      year: form.year ? Number(form.year) : null,
+                      ghg_intensity: form.ghg_intensity ? Number(form.ghg_intensity) : null,
+                      fuel_consumption_g: form.fuel_consumption_t ? Number(form.fuel_consumption_t) * 1_000_000 : null,
+                      distance_km: form.distance_km ? Number(form.distance_km) : null,
+                      ops_energy_mj: form.ops_energy_mj ? Number(form.ops_energy_mj) : null,
+                      lcv_mj_per_g: form.lcv_mj_per_g ? Number(form.lcv_mj_per_g) : null
+                    };
+                    
+                    createRoute(payload)
+                      .then(async () => {
+                        const r = await getRoutes();
+                        setRoutes(r);
+                        setShowModal(false);
+                        setFormError('');
+                        setForm({
+                          route_id: '',
+                          vessel_type: '',
+                          fuel_type: '',
+                          year: '',
+                          ghg_intensity: '',
+                          fuel_consumption_t: '',
+                          distance_km: '',
+                          ops_energy_mj: '',
+                          lcv_mj_per_g: ''
+                        });
+                      })
+                      .catch((err) => {
+                        setFormError(err.message || 'Failed to create route. Please try again.');
+                      });
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+                >
+                  Add Route
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    setFormError('');
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

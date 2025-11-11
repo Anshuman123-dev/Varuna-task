@@ -1,19 +1,36 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
-import { getComparison } from '../adapters/infrastructure/routesService';
+import { getComparison, getRoutes, setBaseline } from '../adapters/infrastructure/routesService';
 
 export default function CompareTab() {
   const [data, setData] = useState<any | null>(null);
+  const [routes, setRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [changing, setChanging] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const c = await getComparison();
-      setData(c);
-      setLoading(false);
-    })();
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    const [c, r] = await Promise.all([getComparison(), getRoutes()]);
+    setData(c);
+    setRoutes(r);
+    setLoading(false);
+  };
+
+  const handleBaselineChange = async (routeId: number) => {
+    setChanging(true);
+    try {
+      await setBaseline(routeId);
+      await loadData();
+    } catch (error) {
+      console.error('Failed to change baseline:', error);
+    } finally {
+      setChanging(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -53,10 +70,27 @@ export default function CompareTab() {
 
       {/* Baseline Info */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-          <span className="text-sm font-medium text-neutral-700">Baseline Route:</span>
-          <span className="text-sm font-semibold text-blue-700">{data.baseline.route_id}</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+            <span className="text-sm font-medium text-neutral-700">Baseline Route:</span>
+            <span className="text-sm font-semibold text-blue-700">{data.baseline.route_id}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-neutral-700">Change Baseline:</label>
+            <select
+              value={data.baseline.id}
+              onChange={(e) => handleBaselineChange(Number(e.target.value))}
+              disabled={changing}
+              className="px-3 py-1.5 text-sm border border-blue-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {routes.map((route) => (
+                <option key={route.id} value={route.id}>
+                  {route.route_id}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 

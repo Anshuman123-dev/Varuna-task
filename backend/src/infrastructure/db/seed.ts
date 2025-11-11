@@ -10,13 +10,13 @@ async function seed() {
 	await db.query('DELETE FROM ship_compliance;');
 	await db.query('DELETE FROM routes;');
 
-	// Insert 5 sample routes (fuel mass in GRAMS)
+	// Insert 5 sample routes (fuel mass in GRAMS, ops_energy in MJ)
 	const routes = [
-		['R-001', 'container', 'VLSFO', 2025, 94.0, 50_000_000, 0.041, 1200.0, 0, true],
-		['R-002', 'container', 'VLSFO', 2025, 88.5, 35_000_000, 0.041, 900.0, 0, false],
-		['R-003', 'ro-ro', 'MGO', 2025, 92.0, 18_500_000, 0.043, 600.0, 0, false],
-		['R-004', 'bulk', 'VLSFO', 2025, 90.1, 70_000_000, 0.041, 1800.0, 0, false],
-		['R-005', 'tanker', 'LNG', 2025, 75.0, 22_000_000, 0.055, 1100.0, 0, false]
+		['R001', 'Container', 'HFO', 2024, 91.0, 5_000_000_000, 0.041, 12000.0, 2050000000, true],
+		['R002', 'BulkCarrier', 'LNG', 2024, 88.0, 4_800_000_000, 0.055, 11500.0, 1968000000, false],
+		['R003', 'Tanker', 'MGO', 2024, 93.5, 5_100_000_000, 0.043, 12500.0, 2091000000, false],
+		['R004', 'RoRo', 'HFO', 2025, 89.2, 4_900_000_000, 0.041, 11800.0, 2009000000, false],
+		['R005', 'Container', 'LNG', 2025, 90.5, 4_950_000_000, 0.055, 11900.0, 2722500000, false]
 	] as const;
 
 	for (const r of routes) {

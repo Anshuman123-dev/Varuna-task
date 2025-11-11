@@ -8,6 +8,15 @@ routesRouter.get('/', async (_req, res) => {
 	res.json(list);
 });
 
+routesRouter.post('/', async (req, res, next) => {
+  try {
+    const created = await routesRepository.create(req.body ?? {});
+    res.status(201).json(created);
+  } catch (e) {
+    next(e);
+  }
+});
+
 routesRouter.post('/:id/baseline', async (req, res, next) => {
 	try {
 		await routesRepository.setBaseline(Number(req.params.id));

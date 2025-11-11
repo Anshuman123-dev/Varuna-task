@@ -82,7 +82,19 @@ export const complianceRepository = {
 			else break;
 		}
 		return count || 1;
+	},
+	async getDistinctShips(): Promise<string[]> {
+		const db = getDb();
+		const { rows } = await db.query<{ ship_id: string }>(
+			'SELECT DISTINCT ship_id FROM ship_compliance ORDER BY ship_id'
+		);
+		return rows.map((r: { ship_id: string }) => r.ship_id);
+	},
+	async getDistinctYears(): Promise<number[]> {
+		const db = getDb();
+		const { rows } = await db.query<{ year: number }>(
+			'SELECT DISTINCT year FROM ship_compliance ORDER BY year'
+		);
+		return rows.map((r: { year: number }) => r.year);
 	}
 };
-
-

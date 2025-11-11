@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
-import { getAdjustedCB, getPenalty, getVerifiedCB } from '../adapters/infrastructure/complianceService';
+import { getAdjustedCB, getPenalty, getVerifiedCB, getShips, getYears } from '../adapters/infrastructure/complianceService';
 import { bank, apply, getAvailable, getRecords } from '../adapters/infrastructure/bankingService';
 import { formatPenalty, gCO2eqToTonnes } from '../shared/units';
 
 export default function BankingTab() {
   const [shipId, setShipId] = useState('SHIP-A');
+  const [customShipId, setCustomShipId] = useState('');
+  const [useCustomShip, setUseCustomShip] = useState(false);
   const [year, setYear] = useState(2025);
+  const [ships, setShips] = useState<string[]>([]);
+  const [years, setYears] = useState<number[]>([]);
   const [summary, setSummary] = useState<{ baseCB: number; bankedSurplus: number; adjustedCB: number } | null>(null);
   const [verified, setVerified] = useState<number | null>(null);
   const [available, setAvailable] = useState<number>(0);
@@ -17,16 +21,22 @@ export default function BankingTab() {
   const [error, setError] = useState<string | null>(null);
   const [kpi, setKpi] = useState<{ cb_before: number; applied: number; cb_after: number } | null>(null);
 
+  const currentShipId = useCustomShip ? customShipId : shipId;
+
   const refresh = async () => {
+    if (!currentShipId.trim()) {
+      setError('Please enter a ship ID');
+      return;
+    }
     setLoading(true);
     setError(null);
     setKpi(null);
     const [adj, ver, avail, recs, pen] = await Promise.all([
-      getAdjustedCB(shipId, year),
-      getVerifiedCB(shipId, year),
-      getAvailable(shipId),
-      getRecords(shipId),
-      getPenalty(shipId, year)
+      getAdjustedCB(currentShipId, year),
+      getVerifiedCB(currentShipId, year),
+      getAvailable(currentShipId),
+      getRecords(currentShipId),
+      getPenalty(currentShipId, year)
     ]);
     setSummary(adj);
     setVerified(ver.verifiedCB);
@@ -37,8 +47,20 @@ export default function BankingTab() {
   };
 
   useEffect(() => {
-    refresh();
-  }, [shipId, year]);
+    (async () => {
+      const [s, y] = await Promise.all([getShips(), getYears()]);
+      setShips(s);
+      setYears(y);
+      if (s.length > 0 && !s.includes(shipId)) setShipId(s[0]);
+      if (y.length > 0 && !y.includes(year)) setYear(y[0]);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (ships.length > 0 && years.length > 0) {
+      refresh();
+    }
+  }, [shipId, year, ships, years]);
 
   const canBank = (verified ?? 0) > 0;
   const canApply = available > 0 && (summary?.adjustedCB ?? 0) < 0;
@@ -50,23 +72,72 @@ export default function BankingTab() {
         <h3 className="text-2xl font-bold text-gray-800">Banking Operations</h3>
       </div>
 
+      {/* Explanatory Section */}
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-5 border-2 border-indigo-200">
+        <h4 className="text-lg font-bold text-indigo-900 mb-3 flex items-center gap-2">
+          <span className="text-xl">ℹ️</span> How Banking Works
+        </h4>
+        <div className="text-sm text-gray-700 space-y-2">
+          <p><strong>Banking Surplus:</strong> When a ship has a positive compliance balance (surplus), it can bank this surplus for future use. Banked surplus can be applied to cover deficits in future years.</p>
+          <p><strong>Applying Banked Surplus:</strong> If a ship has a deficit (negative compliance balance), it can apply previously banked surplus to reduce or eliminate the deficit and avoid penalties.</p>
+          <p><strong>Key Metrics:</strong></p>
+          <ul className="list-disc list-inside ml-4 space-y-1">
+            <li><strong>Base CB:</strong> The initial compliance balance before any banking adjustments</li>
+            <li><strong>Banked Surplus:</strong> Total amount of surplus available from previous years</li>
+            <li><strong>Adjusted CB:</strong> Compliance balance after applying banked surplus</li>
+            <li><strong>Verified CB:</strong> The final verified compliance balance for the year</li>
+          </ul>
+        </div>
+      </div>
+
       <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
         <div className="flex flex-wrap gap-3 items-center">
-        <input
-          value={shipId}
-          onChange={(e) => setShipId(e.target.value)}
-          placeholder="Ship ID"
-          className="px-4 py-2 border-2 border-blue-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-        <input
-          type="number"
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-          className="px-4 py-2 border-2 border-blue-300 rounded-lg text-sm font-medium w-32 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-blue-700">Ship</label>
+          <div className="flex gap-2 items-center">
+            {useCustomShip ? (
+              <input
+                type="text"
+                value={customShipId}
+                onChange={(e) => setCustomShipId(e.target.value)}
+                placeholder="Enter ship ID"
+                className="px-4 py-2 border-2 border-blue-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white w-48"
+              />
+            ) : (
+              <select
+                value={shipId}
+                onChange={(e) => setShipId(e.target.value)}
+                className="px-4 py-2 border-2 border-blue-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                {ships.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={() => setUseCustomShip(!useCustomShip)}
+              className="px-3 py-2 rounded-lg text-xs font-medium bg-white border-2 border-blue-300 hover:bg-blue-50 hover:border-blue-400 transition-all"
+              title={useCustomShip ? 'Switch to dropdown' : 'Enter custom ship ID'}
+            >
+              {useCustomShip ? '📋' : '✏️'}
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-blue-700">Year</label>
+          <select
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="px-4 py-2 border-2 border-blue-300 rounded-lg text-sm font-medium w-32 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          >
+            {years.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={refresh}
-          className="px-4 py-2 rounded-lg text-sm font-medium bg-white border-2 border-blue-300 hover:bg-blue-50 hover:border-blue-400 transition-all"
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-white border-2 border-blue-300 hover:bg-blue-50 hover:border-blue-400 transition-all mt-5"
         >
           🔄 Refresh
         </button>
@@ -128,7 +199,7 @@ export default function BankingTab() {
                 try {
                   setError(null);
                   const grams = Number(bankTonnes) * 1_000_000;
-                  await bank({ shipId, year, amount_gco2eq: grams });
+                  await bank({ shipId: currentShipId, year, amount_gco2eq: grams });
                   setBankTonnes('0');
                   refresh();
                 } catch (e: any) {
@@ -166,7 +237,7 @@ export default function BankingTab() {
                     setError(`Amount exceeds available banked surplus: ${gCO2eqToTonnes(available)}`);
                     return;
                   }
-                  const result = await apply({ shipId, year, amount_gco2eq: grams });
+                  const result = await apply({ shipId: currentShipId, year, amount_gco2eq: grams });
                   setKpi(result);
                   setApplyTonnes('0');
                   refresh();
@@ -238,5 +309,3 @@ export default function BankingTab() {
     </div>
   );
 }
-
-

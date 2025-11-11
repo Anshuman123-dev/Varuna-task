@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS ship_compliance (
   compliance_balance_gco2eq BIGINT,
   adjusted_cb_gco2eq BIGINT,
   verified_cb_gco2eq BIGINT,
-  penalty_eur DECIMAL(15,2),
+  penalty_eur DECIMAL(20,2),
   consecutive_deficit_years INTEGER DEFAULT 0,
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(ship_id, year)

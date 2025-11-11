@@ -1,16 +1,30 @@
-import { apiGet, apiPost } from './apiClient';
+import { apiGetWithFallback, apiPostWithFallback } from './apiClientWithFallback';
+import { generateRandomPoolResult, generateRandomPools } from '../../shared/fallbackData';
 
-export function createPool(body: { year: number; members: { shipId: string; year: number }[] }) {
-  return apiPost<{ poolId: number; members: { shipId: string; adjusted: number; verified: number }[] }>(`/pools`, body);
+export async function createPool(body: { year: number; members: { shipId: string; year: number }[] }) {
+  const fallback = generateRandomPoolResult(body.members);
+  const result = await apiPostWithFallback<{ poolId: number; members: { shipId: string; adjusted: number; verified: number }[] }>(
+    `/pools`,
+    body,
+    fallback
+  );
+  return result.data;
 }
 
-export function listPools(year?: number) {
+export async function listPools(year?: number) {
   const qs = year ? `?year=${year}` : '';
-  return apiGet<any[]>(`/pools${qs}`);
+  const fallback = generateRandomPools(year || 2025);
+  const result = await apiGetWithFallback<any[]>(`/pools${qs}`, fallback);
+  return result.data;
 }
 
-export function getPool(id: number) {
-  return apiGet<{ pool: any | null; members: any[] }>(`/pools/${id}`);
+export async function getPool(id: number) {
+  const fallback = { pool: null, members: [] };
+  const result = await apiGetWithFallback<{ pool: any | null; members: any[] }>(
+    `/pools/${id}`,
+    fallback
+  );
+  return result.data;
 }
 
 

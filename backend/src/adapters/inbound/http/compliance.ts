@@ -83,4 +83,12 @@ complianceRouter.get('/cb', async (req, res) => {
 	});
 });
 
+complianceRouter.get('/ships', async (_req, res) => {
+	const ships = await complianceRepository.getDistinctShips();
+	res.json(ships);
+});
 
+complianceRouter.get('/years', async (_req, res) => {
+	const years = await complianceRepository.getDistinctYears();
+	res.json(years);
+});

@@ -1,15 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 import RoutesTab from './components/RoutesTab';
 import BankingTab from './components/BankingTab';
 import PoolingTab from './components/PoolingTab';
 import CompareTab from './components/CompareTab';
+import FallbackNotification from './components/FallbackNotification';
 
 function App() {
   const [tab, setTab] = useState<'routes' | 'compare' | 'banking' | 'pooling'>('routes');
+  const [showFallback, setShowFallback] = useState(false);
+
+  useEffect(() => {
+    const handleFallback = () => setShowFallback(true);
+    window.addEventListener('fallback-data-used', handleFallback);
+    return () => window.removeEventListener('fallback-data-used', handleFallback);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
+      <FallbackNotification show={showFallback} />
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <h1 className="text-3xl font-bold tracking-tight mb-2">⚓ FuelEU Maritime Compliance</h1>
