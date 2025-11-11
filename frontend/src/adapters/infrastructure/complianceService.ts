@@ -28,8 +28,11 @@ export function getVerifiedCB(shipId: string, year: number) {
 }
 
 export function getPenalty(shipId: string, year: number) {
-  const params = new URLSearchParams({ shipId, year: String(year) });
+  const params = new URLSearchParams({ shipId, year: year.toString() });
   return apiGet<{ penalty: number; consecutiveYears: number; verifiedCB: number }>(`/compliance/penalty?${params.toString()}`);
 }
 
-
+export function getCB(shipId: string, year: number) {
+  const params = new URLSearchParams({ shipId, year: year.toString() });
+  return apiGet<{ baseCB: number; bankedSurplus: number; adjustedCB: number; verifiedCB: number }>(`/compliance/cb?${params.toString()}`);
+}

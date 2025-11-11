@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getAdjustedCB, getPenalty, getVerifiedCB } from '../adapters/infrastructure/complianceService';
-import { bank, getAvailable, getRecords } from '../adapters/infrastructure/bankingService';
+import { bank, apply, getAvailable, getRecords } from '../adapters/infrastructure/bankingService';
 import { formatPenalty, gCO2eqToTonnes } from '../shared/units';
 
 export default function BankingTab() {
@@ -12,10 +12,15 @@ export default function BankingTab() {
   const [records, setRecords] = useState<any[]>([]);
   const [penalty, setPenalty] = useState<{ penalty: number; consecutiveYears: number; verifiedCB: number } | null>(null);
   const [bankTonnes, setBankTonnes] = useState('0');
+  const [applyTonnes, setApplyTonnes] = useState('0');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [kpi, setKpi] = useState<{ cb_before: number; applied: number; cb_after: number } | null>(null);
 
   const refresh = async () => {
     setLoading(true);
+    setError(null);
+    setKpi(null);
     const [adj, ver, avail, recs, pen] = await Promise.all([
       getAdjustedCB(shipId, year),
       getVerifiedCB(shipId, year),
@@ -36,189 +41,202 @@ export default function BankingTab() {
   }, [shipId, year]);
 
   const canBank = (verified ?? 0) > 0;
+  const canApply = available > 0 && (summary?.adjustedCB ?? 0) < 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
-          <h3 className="text-3xl font-bold text-slate-800 mb-6">Carbon Banking Dashboard</h3>
-          
-          {/* Controls */}
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-semibold text-slate-600 mb-2">SHIP ID</label>
-              <input
-                value={shipId}
-                onChange={(e) => setShipId(e.target.value)}
-                placeholder="Enter Ship ID"
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none transition-colors"
-              />
-            </div>
-            <div className="w-40">
-              <label className="block text-xs font-semibold text-slate-600 mb-2">YEAR</label>
-              <input
-                type="number"
-                value={year}
-                onChange={(e) => setYear(Number(e.target.value))}
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none transition-colors"
-              />
-            </div>
-            <button
-              onClick={refresh}
-              disabled={loading}
-              className="mt-6 px-6 py-3 rounded-xl border-2 text-sm font-semibold bg-white border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? '⟳ Loading...' : '↻ Refresh'}
-            </button>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-1 h-8 bg-gradient-to-b from-blue-600 to-blue-700 rounded-full"></div>
+        <h3 className="text-2xl font-bold text-gray-800">Banking Operations</h3>
+      </div>
+
+      <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+        <div className="flex flex-wrap gap-3 items-center">
+        <input
+          value={shipId}
+          onChange={(e) => setShipId(e.target.value)}
+          placeholder="Ship ID"
+          className="px-4 py-2 border-2 border-blue-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+        <input
+          type="number"
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+          className="px-4 py-2 border-2 border-blue-300 rounded-lg text-sm font-medium w-32 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+        <button
+          onClick={refresh}
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-white border-2 border-blue-300 hover:bg-blue-50 hover:border-blue-400 transition-all"
+        >
+          🔄 Refresh
+        </button>
+        </div>
+      </div>
+
+      {loading && <div className="text-sm text-neutral-500">Loading...</div>}
+      
+      {error && (
+        <div className="p-3 border border-red-200 bg-red-50 rounded-lg text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {summary && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 border-2 border-blue-200 rounded-xl bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Base CB</div>
+            <div className="text-xl font-bold text-gray-800">{gCO2eqToTonnes(summary.baseCB)}</div>
+          </div>
+          <div className="p-4 border-2 border-green-200 rounded-xl bg-gradient-to-br from-green-50 to-white shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-1">Banked Surplus</div>
+            <div className="text-xl font-bold text-gray-800">{gCO2eqToTonnes(summary.bankedSurplus)}</div>
+          </div>
+          <div className="p-4 border-2 border-purple-200 rounded-xl bg-gradient-to-br from-purple-50 to-white shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-1">Adjusted CB</div>
+            <div className="text-xl font-bold text-gray-800">{gCO2eqToTonnes(summary.adjustedCB)}</div>
+          </div>
+          <div className="p-4 border-2 border-indigo-200 rounded-xl bg-gradient-to-br from-indigo-50 to-white shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Verified CB</div>
+            <div className="text-xl font-bold text-gray-800">{verified == null ? 'n/a' : gCO2eqToTonnes(verified)}</div>
           </div>
         </div>
+      )}
 
-        {/* Metrics Grid */}
-        {summary && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-500 hover:shadow-xl transition-shadow">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Base CB</div>
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 text-lg">📊</span>
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-800">{gCO2eqToTonnes(summary.baseCB)}</div>
-            </div>
+      <div className="text-sm">
+        <span className="font-medium">Available to bank this year:</span>{' '}
+        {verified == null ? 'n/a' : gCO2eqToTonnes(Math.max(verified, 0))}
+      </div>
 
-            <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-green-500 hover:shadow-xl transition-shadow">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Banked Surplus</div>
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 text-lg">💰</span>
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-800">{gCO2eqToTonnes(summary.bankedSurplus)}</div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-purple-500 hover:shadow-xl transition-shadow">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Adjusted CB</div>
-                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-purple-600 text-lg">⚖️</span>
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-800">{gCO2eqToTonnes(summary.adjustedCB)}</div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-amber-500 hover:shadow-xl transition-shadow">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Verified CB</div>
-                <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                  <span className="text-amber-600 text-lg">✓</span>
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-800">
-                {verified == null ? 'N/A' : gCO2eqToTonnes(verified)}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Banking Action Section */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
-          <div className="mb-6">
-            <div className="inline-flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
-              <span className="text-sm font-semibold text-slate-700">Available to bank this year:</span>
-              <span className="text-lg font-bold text-blue-600">
-                {verified == null ? 'N/A' : gCO2eqToTonnes(Math.max(verified, 0))}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="flex-1 min-w-[250px]">
-              <label className="block text-xs font-semibold text-slate-600 mb-2">AMOUNT TO BANK (TONNES)</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={bankTonnes}
-                onChange={(e) => setBankTonnes(e.target.value)}
-                placeholder="Enter amount in tonnes"
-                disabled={!canBank}
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none transition-colors disabled:bg-slate-100 disabled:cursor-not-allowed"
-              />
-            </div>
+      <div className="space-y-6">
+        <div className="bg-gradient-to-r from-blue-50 to-white p-5 rounded-xl border-2 border-blue-200">
+          <h4 className="text-lg font-bold text-blue-800 mb-3 flex items-center gap-2">
+            <span className="text-xl">💰</span> Bank Surplus
+          </h4>
+          <div className="flex flex-wrap gap-2 items-center">
+            <input
+              type="number"
+              min="0"
+              value={bankTonnes}
+              onChange={(e) => setBankTonnes(e.target.value)}
+              placeholder="Amount to bank (tonnes)"
+              disabled={!canBank}
+              className="px-3 py-2 border border-neutral-300 rounded-md text-sm w-48 disabled:opacity-50"
+            />
             <button
               disabled={!canBank}
               onClick={async () => {
-                const grams = Number(bankTonnes) * 1_000_000;
-                await bank({ shipId, year, amount_gco2eq: grams });
-                setBankTonnes('0');
-                refresh();
+                try {
+                  setError(null);
+                  const grams = Number(bankTonnes) * 1_000_000;
+                  await bank({ shipId, year, amount_gco2eq: grams });
+                  setBankTonnes('0');
+                  refresh();
+                } catch (e: any) {
+                  setError(e?.message || 'Failed to bank surplus');
+                }
               }}
-              className={`px-8 py-3 rounded-xl text-sm font-bold transition-all shadow-md ${
-                canBank
-                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 hover:shadow-lg'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
+              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${canBank ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
             >
-              🏦 Bank Carbon
+              💾 Bank Surplus
             </button>
           </div>
         </div>
 
-        {/* Penalty Alert */}
-        {penalty && penalty.verifiedCB < 0 && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-red-500">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-red-600 text-2xl">⚠️</span>
-              </div>
-              <div>
-                <h4 className="text-lg font-bold text-red-900 mb-2">Penalty Applied</h4>
-                <div className="text-2xl font-bold text-red-600 mb-2">{formatPenalty(penalty.penalty)}</div>
-                <div className="text-sm text-red-700 bg-red-50 inline-block px-3 py-1 rounded-lg">
-                  Consecutive deficit years: <span className="font-bold">{penalty.consecutiveYears}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Banking History */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
-          <h4 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <span>📜</span> Banking History
+        <div className="bg-gradient-to-r from-green-50 to-white p-5 rounded-xl border-2 border-green-200">
+          <h4 className="text-lg font-bold text-green-800 mb-3 flex items-center gap-2">
+            <span className="text-xl">✅</span> Apply Banked Surplus to Deficit
           </h4>
-          {records.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">
-              <div className="text-4xl mb-2">📭</div>
-              <div className="text-sm">No banking records found</div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {records.map((r, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors border border-slate-200"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center font-bold text-blue-600">
-                      {r.year_banked}
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-600">Banked Amount</div>
-                      <div className="text-lg font-bold text-slate-800">{gCO2eqToTonnes(Number(r.amount_gco2eq))}</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs font-semibold text-slate-500 uppercase">Remaining</div>
-                    <div className="text-base font-bold text-green-600">{gCO2eqToTonnes(Number(r.remaining_gco2eq))}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-2 items-center">
+            <input
+              type="number"
+              min="0"
+              value={applyTonnes}
+              onChange={(e) => setApplyTonnes(e.target.value)}
+              placeholder="Amount to apply (tonnes)"
+              disabled={!canApply}
+              className="px-3 py-2 border border-neutral-300 rounded-md text-sm w-48 disabled:opacity-50"
+            />
+            <button
+              disabled={!canApply}
+              onClick={async () => {
+                try {
+                  setError(null);
+                  const grams = Number(applyTonnes) * 1_000_000;
+                  if (grams > available) {
+                    setError(`Amount exceeds available banked surplus: ${gCO2eqToTonnes(available)}`);
+                    return;
+                  }
+                  const result = await apply({ shipId, year, amount_gco2eq: grams });
+                  setKpi(result);
+                  setApplyTonnes('0');
+                  refresh();
+                } catch (e: any) {
+                  setError(e?.message || 'Failed to apply banked surplus');
+                }
+              }}
+              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${canApply ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 shadow-md hover:shadow-lg' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+            >
+              ⚡ Apply Now
+            </button>
+          </div>
+          {!canApply && available > 0 && (
+            <div className="text-xs text-neutral-500 mt-1">No deficit to apply surplus to</div>
+          )}
+          {!canApply && available <= 0 && (
+            <div className="text-xs text-neutral-500 mt-1">No banked surplus available</div>
           )}
         </div>
+      </div>
+
+      {kpi && (
+        <div className="p-5 border-2 border-green-300 bg-gradient-to-r from-green-50 to-green-100 rounded-xl shadow-lg">
+          <h4 className="text-lg font-bold text-green-800 mb-3 flex items-center gap-2">
+            <span className="text-xl">📊</span> Application Result (KPIs)
+          </h4>
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <div>
+              <div className="text-xs text-neutral-600">CB Before</div>
+              <div className="font-medium">{gCO2eqToTonnes(kpi.cb_before)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-neutral-600">Applied</div>
+              <div className="font-medium text-green-700">{gCO2eqToTonnes(kpi.applied)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-neutral-600">CB After</div>
+              <div className="font-medium">{gCO2eqToTonnes(kpi.cb_after)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {penalty && penalty.verifiedCB < 0 && (
+        <div className="p-3 border border-red-200 bg-red-50 rounded-lg">
+          <div className="text-sm">
+            Penalty: <span className="font-medium">{formatPenalty(penalty.penalty)}</span>
+          </div>
+          <div className="text-xs text-red-700">Consecutive deficit years: {penalty.consecutiveYears}</div>
+        </div>
+      )}
+
+      <div className="bg-gradient-to-r from-blue-50 to-white p-5 rounded-xl border-2 border-blue-200">
+        <h4 className="text-lg font-bold text-blue-800 mb-3 flex items-center gap-2">
+          <span className="text-xl">📜</span> Banked History
+        </h4>
+        <ul className="space-y-1 text-sm">
+          {records.map((r, i) => (
+            <li key={i} className="flex items-center gap-2">
+              <span className="text-neutral-500">{r.year_banked}:</span>
+              <span>{gCO2eqToTonnes(Number(r.amount_gco2eq))}</span>
+              <span className="text-neutral-500">
+                (remaining {gCO2eqToTonnes(Number(r.remaining_gco2eq))})
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
 }
+
+

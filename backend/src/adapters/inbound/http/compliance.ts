@@ -66,4 +66,21 @@ complianceRouter.get('/penalty', async (req, res, next) => {
 	}
 });
 
+complianceRouter.get('/cb', async (req, res) => {
+	const shipId = String(req.query.shipId);
+	const year = Number(req.query.year);
+	const base = await complianceRepository.getBase(shipId, year);
+	if (!base) {
+		res.json({ baseCB: null, bankedSurplus: null, adjustedCB: null, verifiedCB: null });
+		return;
+	}
+	const result = await computeAdjustedCB(shipId, year);
+	res.json({
+		baseCB: Number(base.compliance_balance_gco2eq ?? 0),
+		bankedSurplus: result.bankedSurplus,
+		adjustedCB: result.adjustedCB,
+		verifiedCB: Number(base.verified_cb_gco2eq ?? base.adjusted_cb_gco2eq ?? 0)
+	});
+});
+
 

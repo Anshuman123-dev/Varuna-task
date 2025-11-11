@@ -9,38 +9,61 @@ function App() {
   const [tab, setTab] = useState<'routes' | 'compare' | 'banking' | 'pooling'>('routes');
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900">
-      <div className="max-w-6xl mx-auto p-6">
-        <h1 className="text-2xl font-semibold tracking-tight mb-4">Fuel EU Compliance Dashboard</h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <h1 className="text-3xl font-bold tracking-tight mb-2">⚓ FuelEU Maritime Compliance</h1>
+          <p className="text-blue-100 text-sm">Banking & Pooling Dashboard - Articles 20 & 21</p>
+        </div>
+      </div>
 
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button
-            onClick={() => setTab('routes')}
-            className={`px-3 py-2 rounded-md border text-sm ${tab === 'routes' ? 'bg-blue-600 border-blue-700 text-white' : 'bg-white border-neutral-300 hover:bg-neutral-100'}`}
-          >
-            Routes
-          </button>
-          <button
-            onClick={() => setTab('compare')}
-            className={`px-3 py-2 rounded-md border text-sm ${tab === 'compare' ? 'bg-blue-600 border-blue-700 text-white' : 'bg-white border-neutral-300 hover:bg-neutral-100'}`}
-          >
-            Compare
-          </button>
-          <button
-            onClick={() => setTab('banking')}
-            className={`px-3 py-2 rounded-md border text-sm ${tab === 'banking' ? 'bg-blue-600 border-blue-700 text-white' : 'bg-white border-neutral-300 hover:bg-neutral-100'}`}
-          >
-            Banking
-          </button>
-          <button
-            onClick={() => setTab('pooling')}
-            className={`px-3 py-2 rounded-md border text-sm ${tab === 'pooling' ? 'bg-blue-600 border-blue-700 text-white' : 'bg-white border-neutral-300 hover:bg-neutral-100'}`}
-          >
-            Pooling
-          </button>
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="bg-white rounded-xl shadow-sm border border-blue-100 mb-6 p-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setTab('routes')}
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                tab === 'routes'
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
+                  : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+              }`}
+            >
+              📊 Routes
+            </button>
+            <button
+              onClick={() => setTab('compare')}
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                tab === 'compare'
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
+                  : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+              }`}
+            >
+              📈 Compare
+            </button>
+            <button
+              onClick={() => setTab('banking')}
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                tab === 'banking'
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
+                  : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+              }`}
+            >
+              🏦 Banking
+            </button>
+            <button
+              onClick={() => setTab('pooling')}
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                tab === 'pooling'
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
+                  : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+              }`}
+            >
+              🤝 Pooling
+            </button>
+          </div>
         </div>
 
-        <div className="bg-white border border-neutral-200 rounded-lg shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-lg border border-blue-100 p-6">
           {tab === 'routes' && <RoutesTab />}
           {tab === 'compare' && <CompareTab />}
           {tab === 'banking' && <BankingTab />}

@@ -24,7 +24,11 @@ export async function bankSurplus({
 	if (amount_gco2eq > verified) {
 		throw new Error('Cannot bank more than verified CB');
 	}
-	// naive: no "already banked this year" guard state stored; would need extra flag/lookup
+	// Check if already banked for this year
+	const alreadyBanked = await bankingRepository.hasAlreadyBanked(shipId, year);
+	if (alreadyBanked) {
+		throw new Error('Surplus already banked for this year');
+	}
 	await bankingRepository.bank(shipId, year, amount_gco2eq);
 	return { banked: amount_gco2eq };
 }
