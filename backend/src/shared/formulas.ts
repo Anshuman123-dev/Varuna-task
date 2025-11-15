@@ -66,3 +66,4 @@ export function getGHGITarget(year: number): number {
 }
 
 
+

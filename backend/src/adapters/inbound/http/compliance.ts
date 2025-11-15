@@ -92,3 +92,4 @@ complianceRouter.get('/years', async (_req, res) => {
 	const years = await complianceRepository.getDistinctYears();
 	res.json(years);
 });
+

@@ -13,3 +13,4 @@ export async function calculatePenaltyWithConsecutive(shipId: string, year: numb
 }
 
 
+

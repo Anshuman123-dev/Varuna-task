@@ -80,3 +80,4 @@ export async function getYears() {
   const result = await apiGetWithFallback<number[]>('/compliance/years', fallback);
   return result.data;
 }
+

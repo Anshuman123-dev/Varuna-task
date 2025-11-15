@@ -98,3 +98,4 @@ export const complianceRepository = {
 		return rows.map((r: { year: number }) => r.year);
 	}
 };
+

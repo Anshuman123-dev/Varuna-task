@@ -48,3 +48,4 @@ export async function apply(body: { shipId: string; year: number; amount_gco2eq:
 }
 
 
+

@@ -13,3 +13,4 @@ export function formatPenalty(eur: number): string {
 // Note: Always send grams/gCO2eq to API, only convert for display
 
 
+
